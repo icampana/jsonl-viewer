@@ -13,10 +13,19 @@ permissions:
 jobs:
     release-please:
         runs-on: ubuntu-latest
+        outputs:
+            releases_created: ${{ steps.release.outputs.releases_created }}
         steps:
             - uses: googleapis/release-please-action@v4
+              id: release
               with:
                   # This will handle versioning for multiple components if configured
                   # For a simple single package, we can rely on default or config file
                   config-file: release-please-config.json
                   manifest-file: .release-please-manifest.json
+
+    build-release:
+        needs: release-please
+        if: ${{ needs.release-please.outputs.releases_created }}
+        uses: ./.github/workflows/release.yml
+        secrets: inherit
