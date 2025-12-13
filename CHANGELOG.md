@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.1.0...jsonl-viewer-v0.2.0) (2025-12-13)
+
+
+### Features
+
+* **search:** Solved the issues with the jsonPath search ([e5596ec](https://github.com/icampana/jsonl-viewer/commit/e5596ece999f68686ea49857747d8b0d8d8fc518))
+
+
+### Bug Fixes
+
+* disabled the regex search option ([90f5bc3](https://github.com/icampana/jsonl-viewer/commit/90f5bc3efa8c334769a5e94a0073f7dede79fab6))
+
 ## [0.1.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.0.1...jsonl-viewer-v0.1.0) (2025-12-13)
 
 
