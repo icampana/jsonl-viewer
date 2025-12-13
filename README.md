@@ -16,6 +16,10 @@ A high-performance, modern desktop application for viewing, searching, and analy
 -   **Modern UI**: Clean, native-feeling interface with Dark and Light (Zinc) themes.
 -   **Cross-Platform**: Runs natively on macOS, Windows, and Linux.
 
+## 📸 Screenshots
+
+![App Screenshot](static/sample-screenshot.png)
+
 ## 🛠️ Tech Stack
 
 -   **Frontend**: Svelte 5, TailwindCSS, Lucide Icons.
@@ -65,9 +69,18 @@ The build artifacts will be located in `src-tauri/target/release/bundle/`.
 ## 📖 Usage
 
 1.  **Open File**: Drag and drop a `.json` or `.jsonl` file, or use `Cmd+O` (File -> Open).
-2.  **View Data**: Scroll through the virtualized list. Columns are automatically generated from your data.
-3.  **Search**: Use the search bar efficiently filter rows based on content.
-4.  **Export**: Click "Export" in the menu (`Cmd+E`) or status bar to save your current view to Excel or CSV.
+2.  **Open from URL**: Use `Cmd+Shift+O` to load a file directly from a URL.
+3.  **View Data**: Scroll through the virtualized list. Columns are automatically generated from your data.
+4.  **Search**: Use the search bar efficiently filter rows based on content.
+5.  **Export**: Click "Export" in the menu (`Cmd+E`) or status bar to save your current view to Excel or CSV.
+
+### 🧪 Test Data
+
+You can test the application using the sample datasets provided by Microsoft Edge:
+[JSON Dummy Data](https://microsoftedge.github.io/Demos/json-dummy-data/)
+
+Example URL to try:
+`https://microsoftedge.github.io/Demos/json-dummy-data/1MB.json`
 
 ## 🤝 Contributing
 
