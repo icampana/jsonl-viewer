@@ -70,12 +70,6 @@ pub async fn parse_file_streaming(
         // Only if NOT strict jsonl AND starts with [
         if !is_strict_jsonl && trimmed.starts_with("[") {
              // Handle JSON array format - Legacy "Explode" Behavior for standard .json files
-             // We attempt to parse the FIRST line as a full array.
-             // Note: correctly supporting multi-line JSON arrays streaming is complex,
-             // this existing logic assumes the array is on the first line or we parse the first valid line as an array.
-             // If the file is a massive multi-line JSON array, this simple `from_str` on `first_line` might fail if it's not all on one line.
-             // However, for the scope of "fixing the bug", we are preserving existing behavior for .json
-             // while fixing it for .jsonl.
             if let Ok(json_array) = serde_json::from_str::<serde_json::Value>(&first_line) {
                 if let Some(array) = json_array.as_array() {
                     format = FileFormat::JsonArray;
@@ -101,13 +95,19 @@ pub async fn parse_file_streaming(
                  // It started with [, but wasn't a valid single-line array.
                  // Fallback to strict line processing (could be a parser error later on individual lines).
                  // We treat it as a normal line.
-                 process_single_line(&first_line, line_num, byte_offset, &mut chunk, &channel)?;
+                 let is_valid = process_single_line(&first_line, line_num, byte_offset, &mut chunk, &channel)?;
+                 if !is_valid {
+                     return Err("File content is not valid JSON".to_string());
+                 }
                  line_num += 1;
             }
         } else {
             // Strict JSONL or generic object handling
             // Process first line
-            process_single_line(&first_line, line_num, byte_offset, &mut chunk, &channel)?;
+            let is_valid = process_single_line(&first_line, line_num, byte_offset, &mut chunk, &channel)?;
+            if !is_valid {
+                 return Err("File content is not valid JSON".to_string());
+            }
             line_num += 1;
         }
 
@@ -120,7 +120,9 @@ pub async fn parse_file_streaming(
              while let Ok(Some(line)) = lines.next_line().await {
                 byte_offset += (line.len() as u64) + 1; // +1 for newline
 
-                process_single_line(&line, line_num, byte_offset, &mut chunk, &channel)?;
+                // For subsequent lines, we stick to lenient parsing (ignoring errors)
+                // to support partially corrupted log files.
+                let _ = process_single_line(&line, line_num, byte_offset, &mut chunk, &channel)?;
                 line_num += 1;
             }
         }
@@ -146,9 +148,9 @@ fn process_single_line(
     byte_offset: u64,
     chunk: &mut Vec<JsonLine>,
     channel: &Channel<Vec<JsonLine>>
-) -> Result<(), String> {
+) -> Result<bool, String> {
     if line.trim().is_empty() {
-        return Ok(());
+        return Ok(true); // Empty lines are considered valid/ignorable
     }
 
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
@@ -164,6 +166,8 @@ fn process_single_line(
             channel.send(chunk.clone()).map_err(|e| format!("Failed to send data: {}", e))?;
             chunk.clear();
         }
+        Ok(true)
+    } else {
+        Ok(false)
     }
-    Ok(())
 }
