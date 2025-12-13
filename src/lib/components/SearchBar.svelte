@@ -95,15 +95,16 @@
 				Case Sensitive
 			</label>
 
-			<label class="flex items-center gap-2 text-sm">
+			<!-- TODO: Enable Regex search in future versions -->
+			<!-- <label class="flex items-center gap-2 text-sm text-muted-foreground cursor-not-allowed">
 				<input
 					type="checkbox"
-					bind:checked={useRegex}
-					on:change={immediateSearch}
+					checked={false}
+					disabled
 					class="rounded border-input"
 				/>
-				Regex
-			</label>
+				Regex (Coming Soon)
+			</label> -->
 		</div>
 	</div>
  {/if}
