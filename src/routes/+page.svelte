@@ -18,8 +18,10 @@ import FileViewer from "$lib/components/FileViewer.svelte";
 import DetailPanel from "$lib/components/DetailPanel.svelte";
 import StatusBar from "$lib/components/StatusBar.svelte";
 import Toast from "$lib/components/Toast.svelte";
+import UrlDialog from "$lib/components/UrlDialog.svelte";
 
 let isDragging = false;
+let showUrlDialog = false;
 
 async function handleExport() {
     if (!$fileStore.metadata) return;
@@ -112,11 +114,16 @@ async function loadFile(path: string) {
     }
 }
 
+function handleUrlLoad(event: CustomEvent<string>) {
+    loadFile(event.detail);
+}
+
 onMount(() => {
     let unlisteners: (() => void)[] = [];
 
     const setupListeners = async () => {
         unlisteners.push(await listen("menu:open-file", () => openFile()));
+        unlisteners.push(await listen("menu:open-url", () => showUrlDialog = true));
         unlisteners.push(await listen("menu:export-file", () => handleExport()));
         unlisteners.push(await listen("menu:close-file", () => fileStore.reset()));
 
@@ -163,7 +170,6 @@ onMount(() => {
     };
 });
 
-// HTML5 handlers removed
 async function handleSearch() {
     if (!$fileStore.metadata) return;
 
@@ -234,6 +240,13 @@ async function openFile() {
 
     <StatusBar />
     <Toast />
+
+    {#if showUrlDialog}
+        <UrlDialog
+            on:close={() => showUrlDialog = false}
+            on:load={handleUrlLoad}
+        />
+    {/if}
 
     <!-- Drag Overlay -->
     {#if isDragging}

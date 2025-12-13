@@ -3,7 +3,7 @@
 
 mod commands;
 
-use commands::{file_parser, search, export};
+use commands::{file_parser, search, export, network};
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::Emitter;
@@ -35,11 +35,13 @@ fn main() {
 
             // File Menu
             let open_i = MenuItem::with_id(handle, "open_file", "Open File", true, Some("CmdOrCtrl+O"))?;
+            let open_url_i = MenuItem::with_id(handle, "open_url", "Open from URL...", true, Some("CmdOrCtrl+Shift+O"))?;
             let export_i = MenuItem::with_id(handle, "export_file", "Export...", true, Some("CmdOrCtrl+E"))?;
             let close_i = MenuItem::with_id(handle, "close_file", "Close File", true, Some("CmdOrCtrl+W"))?;
 
             let file_menu = Submenu::with_items(handle, "File", true, &[
                 &open_i,
+                &open_url_i,
                 &export_i,
                 &PredefinedMenuItem::separator(handle)?,
                 &close_i,
@@ -83,6 +85,8 @@ fn main() {
                 let event_id = event.id().as_ref();
                 if event_id == "open_file" {
                     let _ = app.emit("menu:open-file", ());
+                } else if event_id == "open_url" {
+                    let _ = app.emit("menu:open-url", ());
                 } else if event_id == "export_file" {
                     let _ = app.emit("menu:export-file", ());
                 } else if event_id == "close_file" {
@@ -97,7 +101,8 @@ fn main() {
             file_parser::parse_file_streaming,
             search::search_in_file,
             export::export_to_csv,
-            export::export_to_excel
+            export::export_to_excel,
+            network::download_url_to_temp
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
