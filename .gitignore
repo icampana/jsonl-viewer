@@ -29,3 +29,6 @@ target/
 # Python
 .icon-venv/
 __pycache__/
+process_icon.py
+app-icon.png
+app-icon-processed.png
