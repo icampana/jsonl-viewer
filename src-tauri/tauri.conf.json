@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "JSON-L Viewer",
+  "version": "0.0.1",
+  "identifier": "com.jsonl-viewer.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "JSON-L Viewer",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        "default"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "dialog": null,
+    "fs": {
+      "requireLiteralLeadingDot": false
+    }
+  }
+}

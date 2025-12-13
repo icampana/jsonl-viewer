@@ -1,0 +1,1 @@
+# Placeholder icon files - these should be replaced with actual icons
