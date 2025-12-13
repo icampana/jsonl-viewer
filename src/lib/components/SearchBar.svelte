@@ -15,7 +15,21 @@
 
 	const dispatch = createEventDispatcher();
 
+	let debounceTimer: ReturnType<typeof setTimeout>;
+
 	function handleSearch() {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			triggerSearch();
+		}, 300);
+	}
+
+	function immediateSearch() {
+		clearTimeout(debounceTimer);
+		triggerSearch();
+	}
+
+	function triggerSearch() {
 		searchStore.setQuery({
 			text: searchInput || undefined,
 			json_path: jsonPathInput || undefined,
@@ -44,11 +58,11 @@
 				type="text"
 				placeholder="Search in file..."
 				bind:value={searchInput}
-				on:keyup={handleSearch}
+				on:input={handleSearch}
 				class="w-full pl-10 pr-4 py-2 border border-input bg-background rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 			/>
 		</div>
-		
+
 		<Button on:click={() => showAdvanced = !showAdvanced} variant="outline" size="sm">
 			<Filter class="w-4 h-4 mr-2" />
 			Advanced
@@ -65,27 +79,27 @@
 				type="text"
 				placeholder="e.g., $.users[*].name"
 				bind:value={jsonPathInput}
-				on:keyup={handleSearch}
+				on:input={handleSearch}
 				class="w-64 px-3 py-1 border border-input bg-background rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 			/>
 		</div>
-		
+
 		<div class="flex items-center gap-4">
 			<label class="flex items-center gap-2 text-sm">
 				<input
 					type="checkbox"
 					bind:checked={caseSensitive}
-					on:change={handleSearch}
+					on:change={immediateSearch}
 					class="rounded border-input"
 				/>
 				Case Sensitive
 			</label>
-			
+
 			<label class="flex items-center gap-2 text-sm">
 				<input
 					type="checkbox"
 					bind:checked={useRegex}
-					on:change={handleSearch}
+					on:change={immediateSearch}
 					class="rounded border-input"
 				/>
 				Regex

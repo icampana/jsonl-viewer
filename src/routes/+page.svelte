@@ -22,6 +22,7 @@ import UrlDialog from "$lib/components/UrlDialog.svelte";
 
 let isDragging = false;
 let showUrlDialog = false;
+let currentSearchId = 0;
 
 async function handleExport() {
     if (!$fileStore.metadata) return;
@@ -173,6 +174,9 @@ onMount(() => {
 async function handleSearch() {
     if (!$fileStore.metadata) return;
 
+    currentSearchId++;
+    const searchId = currentSearchId;
+
     searchStore.setSearching(true);
     searchStore.setResults([]); // Clear previous results
     searchStore.setError(null);
@@ -180,22 +184,29 @@ async function handleSearch() {
     const channel = new Channel<SearchResult[]>();
 
     channel.onmessage = (chunk) => {
-        searchStore.addResults(chunk);
+        if (searchId === currentSearchId) {
+            searchStore.addResults(chunk);
+        }
     };
 
     try {
         const stats = await invoke("search_in_file", {
             path: $fileStore.metadata.path,
             query: $searchStore.query,
+            fileFormat: $fileStore.metadata.format,
             channel,
         });
 
-        searchStore.setStats(stats as SearchStats);
+        if (searchId === currentSearchId) {
+            searchStore.setStats(stats as SearchStats);
+            searchStore.setSearching(false);
+        }
     } catch (error) {
-        console.error("Search failed:", error);
-        searchStore.setError(error as string);
-    } finally {
-        searchStore.setSearching(false);
+        if (searchId === currentSearchId) {
+            console.error("Search failed:", error);
+            searchStore.setError(error as string);
+            searchStore.setSearching(false);
+        }
     }
 }
 
