@@ -1,38 +1,84 @@
-# sv
+# JSON-L Viewer
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A high-performance, modern desktop application for viewing, searching, and analyzing large JSON and JSON-L (Newline Delimited JSON) files. Built with **Tauri v2**, **Rust**, and **Svelte**, it handles gigabytes of data with ease.
 
-## Creating a project
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-0.0.1-green.svg)
 
-If you're seeing this, you've probably already done this step. Congrats!
+## 🚀 Features
 
-```sh
-# create a new project in the current directory
-npx sv create
+-   **Streaming Architecture**: Loads gigabytes of data instantly without blocking the UI.
+-   **Virtual Scrolling**: Efficiently renders millions of rows using virtualization.
+-   **Auto-Column Detection**: Automatically detects and flattens nested JSON structures into a readable table format.
+-   **Smart Grouping**: Visually groups related headers (e.g., `user_name`, `user_id` → `USER`) for better readability.
+-   **Search & Filter**: Real-time search functionality to quickly find specific records.
+-   **Export Capabilities**: Export your filtered view or entire datasets to **CSV** or **Excel (.xlsx)**.
+-   **Modern UI**: Clean, native-feeling interface with Dark and Light (Zinc) themes.
+-   **Cross-Platform**: Runs natively on macOS, Windows, and Linux.
 
-# create a new project in my-app
-npx sv create my-app
+## 🛠️ Tech Stack
+
+-   **Frontend**: Svelte 5, TailwindCSS, Lucide Icons.
+-   **Backend**: Rust (Tauri), Tokio (Async I/O), Serde.
+-   **State Management**: Svelte Stores.
+-   **Build Tool**: Vite.
+
+## 📦 Installation
+
+This project uses `pnpm` (or `npm`) for the frontend and `cargo` for the backend.
+
+### Prerequisites
+
+-   [Node.js](https://nodejs.org/) (v18+)
+-   [Rust](https://www.rust-lang.org/tools/install) (v1.70+)
+-   [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
+
+### Development
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/yourusername/jsonl-viewer.git
+    cd jsonl-viewer
+    ```
+
+2.  Install frontend dependencies:
+    ```bash
+    npm install
+    ```
+
+3.  Run the application in development mode:
+    ```bash
+    npm run tauri dev
+    ```
+    This will start the Vite dev server and compile the Rust backend.
+
+### Building for Production
+
+To create a release build for your operating system:
+
+```bash
+npm run tauri build
 ```
 
-## Developing
+The build artifacts will be located in `src-tauri/target/release/bundle/`.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## 📖 Usage
 
-```sh
-npm run dev
+1.  **Open File**: Drag and drop a `.json` or `.jsonl` file, or use `Cmd+O` (File -> Open).
+2.  **View Data**: Scroll through the virtualized list. Columns are automatically generated from your data.
+3.  **Search**: Use the search bar efficiently filter rows based on content.
+4.  **Export**: Click "Export" in the menu (`Cmd+E`) or status bar to save your current view to Excel or CSV.
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+## 🤝 Contributing
 
-## Building
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-To create a production version of your app:
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
 
-```sh
-npm run build
-```
+## 📄 License
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+This project is open source and available under the [MIT License](LICENSE).
