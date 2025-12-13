@@ -1,0 +1,21 @@
+name: release-please
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: google-github-actions/release-please-action@v4
+              with:
+                  # This will handle versioning for multiple components if configured
+                  # For a simple single package, we can rely on default or config file
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json
