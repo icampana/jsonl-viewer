@@ -27,7 +27,14 @@ A high-performance, modern desktop application for viewing, searching, and analy
 -   **State Management**: Svelte Stores.
 -   **Build Tool**: Vite.
 
-## 📦 Installation
+## � Download
+
+You can download the latest version for macOS, Windows, and Linux from the **Releases** page:
+
+👉 **[Download Binaries](https://github.com/icampana/jsonl-viewer/releases)**
+
+
+## �📦 Installation
 
 This project uses `pnpm` (or `npm`) for the frontend and `cargo` for the backend.
 
@@ -81,6 +88,21 @@ You can test the application using the sample datasets provided by Microsoft Edg
 
 Example URL to try:
 `https://microsoftedge.github.io/Demos/json-dummy-data/1MB.json`
+
+## Running on macOS
+
+Since this app is not signed with an Apple Developer Certificate, you will see a warning when opening it for the first time ("App cannot be opened because the developer cannot be verified").
+
+**To bypass this:**
+
+1.  **Right-click (or Control-click)** the app icon.
+2.  Select **Open** from the menu.
+3.  Click **Open** in the confirmation dialog.
+
+Alternatively, you can remove the quarantine attribute via terminal:
+```bash
+xattr -cr /Applications/JSON-L\ Viewer.app
+```
 
 ## 🤝 Contributing
 
