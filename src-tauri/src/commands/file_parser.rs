@@ -78,7 +78,7 @@ pub async fn parse_file_streaming(
                             id: index,
                             content: serde_json::to_string(item).unwrap_or_default(),
                             parsed: item.clone(),
-                            byte_offset: byte_offset,
+                            byte_offset: 0, // Offset estimation difficult for single-line array items
                         };
 
                         chunk.push(json_line);
@@ -88,16 +88,18 @@ pub async fn parse_file_streaming(
                         }
                         line_num += 1;
                     }
-                    // After successfully processing the array on the first line, we assume the file logic ends here
-                    // for "JsonArray" type files as per previous logic.
                 }
             } else {
                  // It started with [, but wasn't a valid single-line array.
-                 // Fallback to strict line processing (could be a parser error later on individual lines).
-                 // We treat it as a normal line.
-                 let is_valid = process_single_line(&first_line, line_num, byte_offset, &mut chunk, &channel)?;
-                 if !is_valid {
-                     return Err("File content is not valid JSON".to_string());
+                 // It might be a regular multi-line JSON array (pretty printed).
+                 // Attempt to parse line-by-line first (validation check)
+                 let is_valid_line = process_single_line(&first_line, line_num, byte_offset, &mut chunk, &channel)?;
+
+                 if !is_valid_line {
+                     // First line was invalid, but it started with `[`.
+                     // Let's try to parse the ENTIRE file as a JSON array as a fallback.
+                     // This handles pretty-printed JSON files.
+                     return parse_entire_file_as_array(&path, channel).await;
                  }
                  line_num += 1;
             }
@@ -113,15 +115,9 @@ pub async fn parse_file_streaming(
 
         // Always continue reading remaining lines UNLESS we successfully processed a generic JsonArray above
         // (which we can detect if format changed to JsonArray)
-        // If format is JsonArray from the block above, we stop (as it was a single atomic unit)
-        // If format is still JsonL, we continue.
-
         if matches!(format, FileFormat::JsonL) {
              while let Ok(Some(line)) = lines.next_line().await {
                 byte_offset += (line.len() as u64) + 1; // +1 for newline
-
-                // For subsequent lines, we stick to lenient parsing (ignoring errors)
-                // to support partially corrupted log files.
                 let _ = process_single_line(&line, line_num, byte_offset, &mut chunk, &channel)?;
                 line_num += 1;
             }
@@ -139,6 +135,47 @@ pub async fn parse_file_streaming(
         file_size,
         format,
     })
+}
+
+async fn parse_entire_file_as_array(path: &str, channel: Channel<Vec<JsonLine>>) -> Result<FileMetadata, String> {
+    let content = tokio::fs::read_to_string(path).await.map_err(|e| format!("Failed to read file: {}", e))?;
+    let file_size = content.len() as u64;
+
+    let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| "File content is not valid JSON".to_string())?;
+
+    if let Some(array) = json.as_array() {
+        let mut chunk: Vec<JsonLine> = Vec::with_capacity(2000);
+        let mut line_num = 0;
+
+        for (index, item) in array.iter().enumerate() {
+             let json_line = JsonLine {
+                id: index,
+                content: serde_json::to_string(item).unwrap_or_default(),
+                parsed: item.clone(),
+                byte_offset: 0,
+            };
+
+            chunk.push(json_line);
+            if chunk.len() >= 2000 {
+                channel.send(chunk.clone()).map_err(|e| format!("Failed to send data: {}", e))?;
+                chunk.clear();
+            }
+            line_num += 1;
+        }
+
+        if !chunk.is_empty() {
+             channel.send(chunk).map_err(|e| format!("Failed to send data: {}", e))?;
+        }
+
+        Ok(FileMetadata {
+            path: path.to_string(),
+            total_lines: line_num,
+            file_size,
+            format: FileFormat::JsonArray,
+        })
+    } else {
+        Err("File is valid JSON but not a JSON Array or JSONL".to_string())
+    }
 }
 
 // Helper to deduce duplicate logic
