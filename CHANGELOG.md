@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.2.0...jsonl-viewer-v0.3.0) (2025-12-15)
+
+
+### Features
+
+* Added smart formatting for nested data objects ([ac4d3a6](https://github.com/icampana/jsonl-viewer/commit/ac4d3a66f16cbe154a91eb6257f97755f565e20b))
+
+
+### Bug Fixes
+
+* **FileViewer:** allow having up to 100 visible columns by default ([a7ed86b](https://github.com/icampana/jsonl-viewer/commit/a7ed86bb715dcc3445ef8821c8da1e4e364275dd))
+
 ## [0.2.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.1.0...jsonl-viewer-v0.2.0) (2025-12-13)
 
 
