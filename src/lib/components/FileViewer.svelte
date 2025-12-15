@@ -4,10 +4,11 @@ import { searchStore } from "$lib/stores/searchStore";
 import VirtualList from "./VirtualList.svelte";
 import Spinner from "./ui/spinner.svelte";
 import type { JsonLine } from "$lib/types";
+import { Braces } from "lucide-svelte";
 
 // Helper to safely get value for a nested column path (e.g. "user_name")
-function getValue(parsed: any, colPath: string): string {
-    if (!parsed || typeof parsed !== "object") return "";
+function getValue(parsed: any, colPath: string): { text: string; isComplex: boolean } {
+    if (!parsed || typeof parsed !== "object") return { text: "", isComplex: false };
 
     const parts = colPath.split("_");
     let current = parsed;
@@ -18,13 +19,51 @@ function getValue(parsed: any, colPath: string): string {
             current === undefined ||
             typeof current !== "object"
         )
-            return "";
+            return { text: "", isComplex: false };
         current = current[part];
     }
 
-    if (current === undefined || current === null) return "";
-    if (typeof current === "object") return JSON.stringify(current);
-    return String(current);
+    if (current === undefined || current === null) return { text: "", isComplex: false };
+    return smartFormat(current);
+}
+
+function smartFormat(value: any): { text: string; isComplex: boolean } {
+    if (value === null || value === undefined) return { text: "", isComplex: false };
+
+    if (Array.isArray(value)) {
+        if (value.length === 0) return { text: "[]", isComplex: true };
+
+        // heuristic: check first item for common display keys
+        const first = value[0];
+        if (typeof first === 'object' && first !== null) {
+             const displayKeys = ['name', 'title', 'label', 'id', 'slug', 'email', 'username', 'code', 'key', 'status'];
+             const hit = displayKeys.find(k => k in first);
+             if (hit) {
+                 return {
+                     text: value.map((v: any) => v && v[hit]).join(", "),
+                     isComplex: true
+                 };
+             }
+        }
+
+        // fallback for mixed arrays or objects without common keys
+        const text = value.map((v: any) => {
+            if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+            return String(v);
+        }).join(", ");
+        return { text, isComplex: true };
+    }
+
+    if (typeof value === "object") {
+        const displayKeys = ['name', 'title', 'label', 'id', 'slug', 'email', 'username', 'code', 'key', 'status'];
+        const hit = displayKeys.find(k => k in value);
+        if (hit) {
+            return { text: String(value[hit]), isComplex: true };
+        }
+        return { text: JSON.stringify(value), isComplex: true };
+    }
+
+    return { text: String(value), isComplex: false };
 }
 
 let isSearching = $derived(!!($searchStore.query.text || $searchStore.query.json_path));
@@ -196,8 +235,12 @@ let gridCols = $derived(
 
 						<!-- Dynamic Columns -->
 						{#each columns as col}
-							<div class="px-2 truncate border-l border-border/30 h-full flex items-center" title={getValue(item.parsed, col)}>
-								{getValue(item.parsed, col)}
+                            {@const val = getValue(item.parsed, col)}
+							<div class="px-2 truncate border-l border-border/30 h-full flex items-center gap-1.5" title={val.text}>
+                                {#if val.isComplex}
+                                    <Braces class="w-3 h-3 text-muted-foreground/70 shrink-0" />
+                                {/if}
+								<span class="truncate">{val.text}</span>
 							</div>
 						{/each}
 
