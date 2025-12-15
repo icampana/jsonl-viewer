@@ -4,10 +4,11 @@ import { searchStore } from "$lib/stores/searchStore";
 import VirtualList from "./VirtualList.svelte";
 import Spinner from "./ui/spinner.svelte";
 import type { JsonLine } from "$lib/types";
+import { Braces } from "lucide-svelte";
 
 // Helper to safely get value for a nested column path (e.g. "user_name")
-function getValue(parsed: any, colPath: string): string {
-    if (!parsed || typeof parsed !== "object") return "";
+function getValue(parsed: any, colPath: string): { text: string; isComplex: boolean } {
+    if (!parsed || typeof parsed !== "object") return { text: "", isComplex: false };
 
     const parts = colPath.split("_");
     let current = parsed;
@@ -18,13 +19,51 @@ function getValue(parsed: any, colPath: string): string {
             current === undefined ||
             typeof current !== "object"
         )
-            return "";
+            return { text: "", isComplex: false };
         current = current[part];
     }
 
-    if (current === undefined || current === null) return "";
-    if (typeof current === "object") return JSON.stringify(current);
-    return String(current);
+    if (current === undefined || current === null) return { text: "", isComplex: false };
+    return smartFormat(current);
+}
+
+function smartFormat(value: any): { text: string; isComplex: boolean } {
+    if (value === null || value === undefined) return { text: "", isComplex: false };
+
+    if (Array.isArray(value)) {
+        if (value.length === 0) return { text: "[]", isComplex: true };
+
+        // heuristic: check first item for common display keys
+        const first = value[0];
+        if (typeof first === 'object' && first !== null) {
+             const displayKeys = ['name', 'title', 'label', 'id', 'slug', 'email', 'username', 'code', 'key', 'status'];
+             const hit = displayKeys.find(k => k in first);
+             if (hit) {
+                 return {
+                     text: value.map((v: any) => v && v[hit]).join(", "),
+                     isComplex: true
+                 };
+             }
+        }
+
+        // fallback for mixed arrays or objects without common keys
+        const text = value.map((v: any) => {
+            if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+            return String(v);
+        }).join(", ");
+        return { text, isComplex: true };
+    }
+
+    if (typeof value === "object") {
+        const displayKeys = ['name', 'title', 'label', 'id', 'slug', 'email', 'username', 'code', 'key', 'status'];
+        const hit = displayKeys.find(k => k in value);
+        if (hit) {
+            return { text: String(value[hit]), isComplex: true };
+        }
+        return { text: JSON.stringify(value), isComplex: true };
+    }
+
+    return { text: String(value), isComplex: false };
 }
 
 let isSearching = $derived(!!($searchStore.query.text || $searchStore.query.json_path));
@@ -54,46 +93,61 @@ let gridCols = $derived(
         : "1fr",
 );
 
-// Compute Header Groups
-let headerGroups = $derived.by(() => {
-    const groups: { name: string; span: number; isGroup: boolean }[] = [];
-    let currentGroup = "";
-    let currentSpan = 0;
+	let scrollLeft = $state(0);
+	let headerEl: HTMLDivElement | undefined = $state();
 
-    for (const col of columns) {
-        const parts = col.split("_");
-        const groupName = parts.length > 1 ? parts[0] : "";
+	$effect(() => {
+		if (headerEl) {
+			headerEl.scrollLeft = scrollLeft;
+		}
+	});
 
-        if (groupName && groupName === currentGroup) {
-            currentSpan++;
-        } else {
-            if (currentGroup) {
-                groups.push({ name: currentGroup, span: currentSpan, isGroup: true });
-            }
-            // If no group (top level key), push as single
-            if (!groupName) {
-                if (currentGroup) {
-                    // Previous was a group, this is not.
-                    // Push the previous group
-                    // (Already handled above: currentGroup check)
-                }
-                groups.push({ name: col, span: 1, isGroup: false });
-                currentGroup = "";
-                currentSpan = 0;
+    // Compute Header Groups
+    let headerGroups = $derived.by(() => {
+        const groups: { name: string; span: number; isGroup: boolean }[] = [];
+        let currentGroup = "";
+        let currentSpan = 0;
+
+        for (const col of columns) {
+            const parts = col.split("_");
+            const groupName = parts.length > 1 ? parts[0] : "";
+
+            if (groupName && groupName === currentGroup) {
+                currentSpan++;
             } else {
-                // New group
-                currentGroup = groupName;
-                currentSpan = 1;
+                if (currentGroup) {
+                    groups.push({ name: currentGroup, span: currentSpan, isGroup: true });
+                }
+                // If no group (top level key), push as single
+                if (!groupName) {
+                    if (currentGroup) {
+                        // Previous was a group, this is not.
+                        // Push the previous group
+                        // (Already handled above: currentGroup check)
+                    }
+                    groups.push({ name: col, span: 1, isGroup: false });
+                    currentGroup = "";
+                    currentSpan = 0;
+                } else {
+                    // New group
+                    currentGroup = groupName;
+                    currentSpan = 1;
+                }
             }
         }
-    }
-    // Push last group
-    if (currentGroup) {
-        groups.push({ name: currentGroup, span: currentSpan, isGroup: true });
-    }
+        // Push last group
+        if (currentGroup) {
+            groups.push({ name: currentGroup, span: currentSpan, isGroup: true });
+        }
 
-    return groups;
-});
+        return groups;
+    });
+
+	let totalMinWidth = $derived(
+		columns.length > 0
+			? 60 + columns.length * 100 // 60px ID + 100px per column
+			: "100%"
+	);
 </script>
 
 <div class="flex-1 flex flex-col h-full overflow-hidden">
@@ -121,9 +175,12 @@ let headerGroups = $derived.by(() => {
         </div>
     {:else}
         <!-- Table Header (Grouped) -->
-        <div class="bg-muted/40 font-medium text-sm border-b border-border shadow-sm z-10">
+        <div
+			bind:this={headerEl}
+			class="bg-muted/40 font-medium text-sm border-b border-border shadow-sm z-10 overflow-hidden"
+		>
             <!-- Top Row (Groups) -->
-            <div class="grid" style="grid-template-columns: {gridCols}; padding-right: 8px;">
+            <div class="grid" style="grid-template-columns: {gridCols}; padding-right: 8px; min-width: {typeof totalMinWidth === 'number' ? totalMinWidth + 'px' : totalMinWidth};">
                 <div class="p-2 pl-3 text-muted-foreground border-r border-border/30 flex items-end pb-1">#</div>
 
                 {#each headerGroups as group}
@@ -141,7 +198,7 @@ let headerGroups = $derived.by(() => {
             </div>
 
             <!-- Bottom Row (Sub-keys) -->
-            <div class="grid border-t border-border/30 bg-background/50" style="grid-template-columns: {gridCols}; padding-right: 8px;">
+            <div class="grid border-t border-border/30 bg-background/50" style="grid-template-columns: {gridCols}; padding-right: 8px; min-width: {typeof totalMinWidth === 'number' ? totalMinWidth + 'px' : totalMinWidth};">
                 <div class="bg-muted/10 border-r border-border/30"></div> <!-- Spacer for ID -->
 
                 {#each columns as col}
@@ -160,6 +217,8 @@ let headerGroups = $derived.by(() => {
                 items={displayItems}
                 itemHeight={36}
                 overscan={10}
+				minWidth={totalMinWidth}
+				bind:scrollLeft
             >
 				{#snippet children(item, index)}
 					<div
@@ -176,8 +235,12 @@ let headerGroups = $derived.by(() => {
 
 						<!-- Dynamic Columns -->
 						{#each columns as col}
-							<div class="px-2 truncate border-l border-border/30 h-full flex items-center" title={getValue(item.parsed, col)}>
-								{getValue(item.parsed, col)}
+                            {@const val = getValue(item.parsed, col)}
+							<div class="px-2 truncate border-l border-border/30 h-full flex items-center gap-1.5" title={val.text}>
+                                {#if val.isComplex}
+                                    <Braces class="w-3 h-3 text-muted-foreground/70 shrink-0" />
+                                {/if}
+								<span class="truncate">{val.text}</span>
 							</div>
 						{/each}
 
