@@ -6,12 +6,16 @@ let {
 	itemHeight = 60,
 	containerHeight = 400,
 	overscan = 5,
+	minWidth = '100%',
+	scrollLeft = $bindable(0),
 	children,
 } = $props<{
 	items: T[];
 	itemHeight?: number;
 	containerHeight?: number;
 	overscan?: number;
+	minWidth?: string | number;
+	scrollLeft?: number;
 	children: import("svelte").Snippet<[T, number]>;
 }>();
 
@@ -53,6 +57,7 @@ onMount(() => {
 function handleScroll(event: Event) {
 	const target = event.target as HTMLElement;
 	scrollTop = target.scrollTop;
+	scrollLeft = target.scrollLeft;
 }
 
 export function scrollToItem(index: number) {
@@ -66,12 +71,12 @@ export function scrollToItem(index: number) {
 <div
 	bind:this={containerElement}
 	class="virtual-scroll-container h-full"
-	style="height: 100%; overflow-y: auto;"
+	style="height: 100%; overflow: auto;"
 	onscroll={handleScroll}
 >
-	<div style="height: {totalHeight}px; position: relative;">
+	<div style="height: {totalHeight}px; min-width: {typeof minWidth === 'number' ? minWidth + 'px' : minWidth}; position: relative;">
 		<div
-			style="transform: translateY({offsetY}px); position: absolute; top: 0; left: 0; right: 0;"
+			style="transform: translateY({offsetY}px); position: absolute; top: 0; left: 0; width: 100%;"
 		>
 			{#each visibleItems as item, index (startIndex + index)}
 				<div
@@ -93,6 +98,7 @@ export function scrollToItem(index: number) {
 
 	.virtual-scroll-container::-webkit-scrollbar {
 		width: 8px;
+		height: 8px;
 	}
 
 	.virtual-scroll-container::-webkit-scrollbar-track {

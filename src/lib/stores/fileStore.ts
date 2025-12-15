@@ -98,7 +98,7 @@ function createFileStore() {
 						if (bPrio !== -1) return 1;
 
 						return (keyCounts.get(b) || 0) - (keyCounts.get(a) || 0);
-					}).slice(0, 12); // Increase cap to allows groups
+					}).slice(0, 100); // Increase cap to allow more columns
 				}
 
 				return {
