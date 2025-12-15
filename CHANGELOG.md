@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.3.0...jsonl-viewer-v0.4.0) (2025-12-15)
+
+
+### Features
+
+* Added basic statistics for the numeric fields on the dataset ([374da96](https://github.com/icampana/jsonl-viewer/commit/374da96d70798454d90cca7227a9be2a4bf1d78b))
+* **search:** Added support for quick searches directly from the json tree elements ([acab727](https://github.com/icampana/jsonl-viewer/commit/acab727e10d12c7a826fddfc8bc4fea6fa6816a9))
+
+
+### Bug Fixes
+
+* small maintenance, removed unused elements ([3aa7fb6](https://github.com/icampana/jsonl-viewer/commit/3aa7fb62b007ca7d1e981633cd5d970ab0b6451f))
+
 ## [0.3.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.2.0...jsonl-viewer-v0.3.0) (2025-12-15)
 
 
