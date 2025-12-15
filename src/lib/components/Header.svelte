@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { FolderOpen, Moon, Sun } from 'lucide-svelte';
+	import { FolderOpen, Moon, Sun, BarChart } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import { themeStore } from '$lib/stores/themeStore';
 	import { fileStore } from '$lib/stores/fileStore';
@@ -44,13 +44,24 @@
 		</Button>
 		<h1 class="text-lg font-semibold">JSON-L Viewer</h1>
 	</div>
-	
+
 	<div class="flex items-center gap-2">
-		<ExportButton 
+		<ExportButton
 			disabled={!$fileStore.metadata || $fileStore.lines.length === 0}
 			on:export-complete={handleExportComplete}
 			on:export-error={handleExportError}
 		/>
+
+		<Button
+			variant="ghost"
+			size="sm"
+			disabled={!$fileStore.metadata || $fileStore.lines.length === 0}
+			onclick={() => dispatch('open-stats')}
+			title="View Statistics"
+		>
+			<BarChart class="w-4 h-4" />
+		</Button>
+
 		<Button on:click={toggleTheme} variant="ghost" size="sm">
 			{#if $themeStore === 'dark'}
 				<Sun class="w-4 h-4" />

@@ -19,9 +19,11 @@ import DetailPanel from "$lib/components/DetailPanel.svelte";
 import StatusBar from "$lib/components/StatusBar.svelte";
 import Toast from "$lib/components/Toast.svelte";
 import UrlDialog from "$lib/components/UrlDialog.svelte";
+import StatsDialog from "$lib/components/StatsDialog.svelte";
 
 let isDragging = false;
 let showUrlDialog = false;
+let showStats = false;
 let currentSearchId = 0;
 
 async function handleExport() {
@@ -238,7 +240,10 @@ async function openFile() {
 </svelte:head>
 
 <div class="flex flex-col h-screen bg-background text-foreground overflow-hidden relative">
-    <Header {openFile} />
+    <Header
+        {openFile}
+        on:open-stats={() => showStats = true}
+    />
     <SearchBar on:search={handleSearch} />
 
     <!-- Main Workspace -->
@@ -251,7 +256,12 @@ async function openFile() {
     </div>
 
     <StatusBar />
+
     <Toast />
+    <StatsDialog
+        bind:show={showStats}
+        on:close={() => showStats = false}
+    />
 
     {#if showUrlDialog}
         <UrlDialog
