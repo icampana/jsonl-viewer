@@ -6,7 +6,7 @@ use regex::Regex;
 use jsonpath_rust::JsonPathFinder;
 // use std::str::FromStr;
 use crate::commands::file_parser::FileFormat;
-use std::str::FromStr;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchQuery {

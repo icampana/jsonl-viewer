@@ -64,13 +64,13 @@ pub async fn parse_file_streaming(
 
     // Read first line to determine format / content check
     if let Ok(Some(first_line)) = lines.next_line().await {
-        let trimmed = first_line.trim();
+        let trimmed_start = first_line.trim_start();
 
         // Check if we should treat this as a JSON Array (Explode Mode)
         // Only if NOT strict jsonl AND starts with [
-        if !is_strict_jsonl && trimmed.starts_with("[") {
+        if !is_strict_jsonl && trimmed_start.starts_with("[") {
              // Handle JSON array format - Legacy "Explode" Behavior for standard .json files
-            if let Ok(json_array) = serde_json::from_str::<serde_json::Value>(&first_line) {
+             if let Ok(json_array) = serde_json::from_str::<serde_json::Value>(&first_line) {
                 if let Some(array) = json_array.as_array() {
                     format = FileFormat::JsonArray;
                     for (index, item) in array.iter().enumerate() {
@@ -138,10 +138,12 @@ pub async fn parse_file_streaming(
 }
 
 async fn parse_entire_file_as_array(path: &str, channel: Channel<Vec<JsonLine>>) -> Result<FileMetadata, String> {
+    // Read whole file
     let content = tokio::fs::read_to_string(path).await.map_err(|e| format!("Failed to read file: {}", e))?;
     let file_size = content.len() as u64;
 
-    let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| "File content is not valid JSON".to_string())?;
+    // Use serde_json to parse the whole string
+    let json: serde_json::Value = serde_json::from_str(&content).map_err(|_e| "File content is not valid JSON".to_string())?;
 
     if let Some(array) = json.as_array() {
         let mut chunk: Vec<JsonLine> = Vec::with_capacity(2000);
@@ -190,6 +192,7 @@ fn process_single_line(
         return Ok(true); // Empty lines are considered valid/ignorable
     }
 
+    // serde_json parsing
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
         let json_line = JsonLine {
             id,
