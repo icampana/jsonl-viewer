@@ -1,17 +1,21 @@
 <script lang="ts">
-import { ChevronRight, ChevronDown } from "lucide-svelte";
+import { ChevronRight, ChevronDown, Filter } from "lucide-svelte";
 import JsonTreeNode from "./JsonTreeNode.svelte";
+import { searchStore } from "$lib/stores/searchStore";
+import { confirm } from "@tauri-apps/plugin-dialog";
 
 let {
 	keyName = "",
 	value,
 	isLast = true,
 	depth = 0,
+	path = []
 } = $props<{
 	keyName?: string;
 	value: any;
 	isLast?: boolean;
 	depth?: number;
+	path?: (string | number)[];
 }>();
 
 let expanded = $state(false); // Default collapsed for deep trees? User might want auto-expand root.
@@ -36,10 +40,49 @@ function toggle() {
 		expanded = !expanded;
 	}
 }
+
+async function handleContextMenu(e: MouseEvent) {
+	// Only for primitive values for now
+	if (isObject) return;
+
+	e.preventDefault();
+	e.stopPropagation();
+
+	// Construct JSONPath
+	let jsonPath = path.map(p => {
+		if (typeof p === 'number') return `[*]`;
+		if (p === '$') return '$';
+		// If key has spaces or special chars, use bracket notation
+		if (!/^[a-zA-Z0-9_]+$/.test(p as string)) return `['${p}']`;
+		return `.${p}`;
+	}).join('').replace(/^\$\./, '$.').replace(/\.\[/, '['); // Cleanup
+
+    // Split logic: Text = Value, Path = Path
+    // NOTE: This assumes backend supports "json_path matches AND text matches" logic
+	let queryPath = jsonPath;
+    let queryText = String(value);
+
+	const confirmed = await confirm(`Filter by this value?\n\nPath: ${queryPath}\nValue: ${queryText}`, {
+        title: 'Context Filter',
+        kind: 'info'
+    });
+
+	if (confirmed) {
+		searchStore.setQuery({
+			text: queryText,
+			json_path: queryPath,
+			case_sensitive: false,
+			regex: false
+		});
+	}
+}
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="font-mono text-sm leading-6">
-	<div class="flex items-start hover:bg-black/5 rounded px-1 -ml-1 transition-colors">
+	<div
+		class="flex items-start hover:bg-black/5 rounded px-1 -ml-1 transition-colors group relative border border-transparent hover:border-border/30"
+	>
 		<!-- Indentation spacer -->
 		<!-- We don't use margin-left for perf, but flat structure with spacers if needed.
 			 Actually, simple nested div padding is easier for small depth. -->
@@ -61,7 +104,7 @@ function toggle() {
 		{/if}
 
 		<!-- Key & Value -->
-		<div class="flex-1 break-all">
+		<div class="flex-1 break-all flex items-center">
 
 			<!-- Key (if property of object) -->
 			{#if keyName}
@@ -85,16 +128,36 @@ function toggle() {
 				{/if}
 			{:else}
 				<!-- Primitives -->
-				{#if type === 'string'}
-					<span class="text-emerald-600 dark:text-emerald-400">"{value}"</span>
-				{:else if type === 'number'}
-					<span class="text-amber-600 dark:text-amber-400">{value}</span>
-				{:else if type === 'boolean'}
-					<span class="text-violet-600 dark:text-violet-400">{value}</span>
-				{:else if type === 'null'}
-					<span class="text-rose-600 dark:text-rose-400">null</span>
-				{/if}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<span
+					class="cursor-context-menu hover:underline decoration-dotted decoration-muted-foreground/50"
+					oncontextmenu={handleContextMenu}
+					role="button"
+					tabindex="0"
+					title="Right click to filter"
+				>
+					{#if type === 'string'}
+						<span class="text-emerald-600 dark:text-emerald-400">"{value}"</span>
+					{:else if type === 'number'}
+						<span class="text-amber-600 dark:text-amber-400">{value}</span>
+					{:else if type === 'boolean'}
+						<span class="text-violet-600 dark:text-violet-400">{value}</span>
+					{:else if type === 'null'}
+						<span class="text-rose-600 dark:text-rose-400">null</span>
+					{/if}
+				</span>
 				{#if !isLast},{/if}
+			{/if}
+
+			<!-- Hover Action for non-object (optional, distinct visual cue) -->
+			{#if !isObject}
+				<button
+					onclick={handleContextMenu}
+					class="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted text-muted-foreground"
+					title="Filter by this value"
+				>
+					<Filter class="w-3 h-3" />
+				</button>
 			{/if}
 		</div>
 	</div>
@@ -108,6 +171,7 @@ function toggle() {
 						value={item}
 						isLast={i === value.length - 1}
 						depth={depth + 1}
+						path={[...path, i]}
 					/>
 				{/each}
 			{:else}
@@ -117,6 +181,7 @@ function toggle() {
 						value={v}
 						isLast={i === Object.entries(value).length - 1}
 						depth={depth + 1}
+						path={[...path, k]}
 					/>
 				{/each}
 			{/if}

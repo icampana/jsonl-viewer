@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { Search, Filter } from 'lucide-svelte';
+	import { Search, Filter, X } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import { searchStore } from '$lib/stores/searchStore';
 	import { invoke } from '@tauri-apps/api/core';
@@ -14,6 +14,44 @@
 	let useRegex = false;
 
 	const dispatch = createEventDispatcher();
+
+	let unsubscribe: () => void;
+
+	import { onMount, onDestroy } from 'svelte';
+
+	onMount(() => {
+		unsubscribe = searchStore.subscribe(state => {
+			let shouldSearch = false;
+
+			if (state.query.text !== undefined && state.query.text !== searchInput) {
+				searchInput = state.query.text;
+				shouldSearch = true;
+			}
+			if (state.query.json_path !== undefined && state.query.json_path !== jsonPathInput) {
+				jsonPathInput = state.query.json_path;
+				shouldSearch = true;
+			}
+			// If store cleared inputs (undefined/empty), sync that too if needed,
+			// but state.query default is empty string in UI logic usually.
+			// Check store init: text: '', json_path: ''.
+			if (!state.query.text && searchInput) {
+				searchInput = '';
+				shouldSearch = true;
+			}
+			if (!state.query.json_path && jsonPathInput) {
+				jsonPathInput = '';
+				shouldSearch = true;
+			}
+
+			if (shouldSearch) {
+				dispatch('search');
+			}
+		});
+	});
+
+	onDestroy(() => {
+		if (unsubscribe) unsubscribe();
+	});
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
@@ -39,6 +77,13 @@
 		dispatch('search');
 	}
 
+	function clearSearch() {
+		searchInput = '';
+		jsonPathInput = '';
+		triggerSearch();
+		document.getElementById('search-input')?.focus();
+	}
+
 	function handleKeyboardShortcut(event: KeyboardEvent) {
 		if (event.metaKey && event.key === 'f') {
 			event.preventDefault();
@@ -47,7 +92,7 @@
 	}
 </script>
 
-<svelte:window on:keydown={handleKeyboardShortcut} />
+<svelte:window onkeydown={handleKeyboardShortcut} />
 
 <div class="flex items-center gap-2 p-4 border-b border-border bg-card">
 	<div class="flex-1 flex items-center gap-2">
@@ -58,12 +103,20 @@
 				type="text"
 				placeholder="Search in file..."
 				bind:value={searchInput}
-				on:input={handleSearch}
+				oninput={handleSearch}
 				class="w-full pl-10 pr-4 py-2 border border-input bg-background rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 			/>
+			{#if searchInput || jsonPathInput}
+				<button
+					onclick={clearSearch}
+					class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors"
+				>
+					<X class="w-4 h-4" />
+				</button>
+			{/if}
 		</div>
 
-		<Button on:click={() => showAdvanced = !showAdvanced} variant="outline" size="sm">
+		<Button onclick={() => showAdvanced = !showAdvanced} variant="outline" size="sm">
 			<Filter class="w-4 h-4 mr-2" />
 			Advanced
 		</Button>
@@ -79,7 +132,7 @@
 				type="text"
 				placeholder="e.g., $.users[*].name"
 				bind:value={jsonPathInput}
-				on:input={handleSearch}
+				oninput={handleSearch}
 				class="w-64 px-3 py-1 border border-input bg-background rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 			/>
 		</div>
@@ -89,7 +142,7 @@
 				<input
 					type="checkbox"
 					bind:checked={caseSensitive}
-					on:change={immediateSearch}
+					onchange={immediateSearch}
 					class="rounded border-input"
 				/>
 				Case Sensitive

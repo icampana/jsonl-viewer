@@ -5,5 +5,5 @@
 </script>
 
 <div class="w-full overflow-x-auto text-sm">
-	<JsonTreeNode value={value} isLast={true} />
+	<JsonTreeNode value={value} isLast={true} path={['$']} />
 </div>

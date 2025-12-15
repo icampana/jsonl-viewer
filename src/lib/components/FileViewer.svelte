@@ -151,7 +151,7 @@ let gridCols = $derived(
 </script>
 
 <div class="flex-1 flex flex-col h-full overflow-hidden">
-    {#if $fileStore.isLoading || ($searchStore.isSearching && displayItems.length === 0 && !$searchStore.stats)}
+    {#if $fileStore.isLoading || ($searchStore.isSearching && displayItems.length === 0)}
         <div class="flex items-center justify-center h-full">
             <Spinner size="lg" text={isSearching ? "Searching..." : "Loading file..."} />
         </div>

@@ -69,6 +69,7 @@ async function handleExport() {
 
 async function loadFile(path: string) {
     fileStore.reset();
+    searchStore.reset();
     fileStore.setLoading(true);
 
     const channel = new Channel<JsonLine[]>();
