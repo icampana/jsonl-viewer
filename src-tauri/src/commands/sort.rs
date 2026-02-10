@@ -144,32 +144,29 @@ pub async fn sort_file_lines(
 			.map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
 		if let Some(array) = json.as_array() {
-			let mut lines: Vec<(usize, JsonLine)> = Vec::with_capacity(array.len());
+			// Extract sort keys once per item for better performance
+			let mut lines_with_keys: Vec<(usize, JsonLine, SortValue)> = array
+				.iter()
+				.enumerate()
+				.map(|(index, item)| {
+					let sort_val = get_nested_value(item, &column_path);
+					let sort_key = sort_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
+					(
+						index,
+						JsonLine {
+							id: index,
+							content: serde_json::to_string(item).unwrap_or_default(),
+							parsed: item.clone(),
+							byte_offset: 0,
+						},
+						sort_key,
+					)
+				})
+				.collect();
 
-			for (index, item) in array.iter().enumerate() {
-				let sort_val = get_nested_value(item, &column_path);
-				let sort_key = sort_val.as_ref().map(|v| to_sort_value(v));
-
-				lines.push((
-					index,
-					JsonLine {
-						id: index,
-						content: serde_json::to_string(item).unwrap_or_default(),
-						parsed: item.clone(),
-						byte_offset: 0,
-					}
-				));
-			}
-
-			// Sort by extracted values
-			lines.sort_by(|a, b| {
-				let a_val = get_nested_value(&a.1.parsed, &column_path);
-				let b_val = get_nested_value(&b.1.parsed, &column_path);
-
-				let a_key = a_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
-				let b_key = b_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
-
-				let cmp = compare_sort_values(&a_key, &b_key, &direction);
+			// Sort by pre-extracted values
+			lines_with_keys.sort_by(|a, b| {
+				let cmp = compare_sort_values(&a.2, &b.2, &direction);
 				if cmp == std::cmp::Ordering::Equal {
 					a.0.cmp(&b.0)  // Stable sort by original index
 				} else {
@@ -177,11 +174,15 @@ pub async fn sort_file_lines(
 				}
 			});
 
+			// Extract sorted lines for streaming
+			let lines: Vec<JsonLine> = lines_with_keys.into_iter().map(|(_, line, _)| line).collect();
+			let lines_len = lines.len();
+
 			// Stream sorted results
 			const CHUNK_SIZE: usize = 2000;
 			let mut chunk: Vec<JsonLine> = Vec::with_capacity(CHUNK_SIZE);
 
-			for (_, line) in &lines {
+			for line in &lines {
 				chunk.push(line.clone());
 				if chunk.len() >= CHUNK_SIZE {
 					channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
@@ -193,7 +194,7 @@ pub async fn sort_file_lines(
 				channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
 			}
 
-			return Ok(lines.len());
+			return Ok(lines_len);
 		}
 	}
 
@@ -206,10 +207,13 @@ pub async fn sort_file_lines(
 	let mut lines = reader.lines();
 
 	let mut line_num = 0;
-	let mut all_lines: Vec<(usize, JsonLine)> = Vec::new();
+	let mut all_lines: Vec<(usize, JsonLine, SortValue)> = Vec::new();
 
 	while let Ok(Some(line)) = lines.next_line().await {
 		if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+			let sort_val = get_nested_value(&json, &column_path);
+			let sort_key = sort_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
+
 			all_lines.push((
 				line_num,
 				JsonLine {
@@ -217,21 +221,16 @@ pub async fn sort_file_lines(
 					content: line.clone(),
 					parsed: json,
 					byte_offset: 0,
-				}
+				},
+				sort_key,
 			));
 		}
 		line_num += 1;
 	}
 
-	// Sort by extracted values
+	// Sort by pre-extracted values
 	all_lines.sort_by(|a, b| {
-		let a_val = get_nested_value(&a.1.parsed, &column_path);
-		let b_val = get_nested_value(&b.1.parsed, &column_path);
-
-		let a_key = a_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
-		let b_key = b_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
-
-		let cmp = compare_sort_values(&a_key, &b_key, &direction);
+		let cmp = compare_sort_values(&a.2, &b.2, &direction);
 		if cmp == std::cmp::Ordering::Equal {
 			a.0.cmp(&b.0)  // Stable sort by original index
 		} else {
@@ -239,11 +238,15 @@ pub async fn sort_file_lines(
 		}
 	});
 
+	// Extract sorted lines for streaming
+	let lines: Vec<JsonLine> = all_lines.into_iter().map(|(_, line, _)| line).collect();
+	let lines_len = lines.len();
+
 	// Stream sorted results
 	const CHUNK_SIZE: usize = 2000;
 	let mut chunk: Vec<JsonLine> = Vec::with_capacity(CHUNK_SIZE);
 
-	for (_, line) in &all_lines {
+	for line in &lines {
 		chunk.push(line.clone());
 		if chunk.len() >= CHUNK_SIZE {
 			channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
@@ -255,7 +258,7 @@ pub async fn sort_file_lines(
 		channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
 	}
 
-	Ok(all_lines.len())
+	Ok(lines_len)
 }
 
 /// Command to sort search results by a column
@@ -268,33 +271,37 @@ pub async fn sort_search_results(
 	let direction = sort_column.direction.clone();
 	let column_path = sort_column.column.clone();
 
-	let mut sorted_results: Vec<(usize, SearchResult)> = results.into_iter().enumerate().collect();
+	// Extract sort keys once per item for better performance
+	let mut results_with_keys: Vec<(usize, SearchResult, SortValue)> = results
+		.into_iter()
+		.enumerate()
+		.map(|(index, result)| {
+			let parsed = serde_json::from_str::<serde_json::Value>(&result.context).ok();
+			let val = parsed.as_ref().and_then(|v| get_nested_value(v, &column_path));
+			let sort_key = val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
+			(index, result, sort_key)
+		})
+		.collect();
 
-		// Sort by extracted values
-		sorted_results.sort_by(|a, b| {
-			// Parse context JSON to extract values
-			let a_parsed = serde_json::from_str::<serde_json::Value>(&a.1.context).ok();
-			let b_parsed = serde_json::from_str::<serde_json::Value>(&b.1.context).ok();
+	// Sort by pre-extracted values
+	results_with_keys.sort_by(|a, b| {
+		let cmp = compare_sort_values(&a.2, &b.2, &direction);
+		if cmp == std::cmp::Ordering::Equal {
+			a.0.cmp(&b.0)  // Stable sort by original index
+		} else {
+			cmp
+		}
+	});
 
-			let a_val = a_parsed.as_ref().and_then(|v| get_nested_value(v, &column_path));
-			let b_val = b_parsed.as_ref().and_then(|v| get_nested_value(v, &column_path));
-
-			let a_sort_val = a_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
-			let b_sort_val = b_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
-
-			let cmp = compare_sort_values(&a_sort_val, &b_sort_val, &direction);
-			if cmp == std::cmp::Ordering::Equal {
-				a.0.cmp(&b.0)  // Stable sort by original index
-			} else {
-				cmp
-			}
-		});
+	// Extract sorted results for streaming
+	let sorted_results: Vec<SearchResult> = results_with_keys.into_iter().map(|(_, result, _)| result).collect();
+	let sorted_len = sorted_results.len();
 
 	// Stream sorted results
 	const CHUNK_SIZE: usize = 100;
 	let mut chunk: Vec<SearchResult> = Vec::with_capacity(CHUNK_SIZE);
 
-	for (_, result) in &sorted_results {
+	for result in &sorted_results {
 		chunk.push(result.clone());
 		if chunk.len() >= CHUNK_SIZE {
 			channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
@@ -306,5 +313,5 @@ pub async fn sort_search_results(
 		channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
 	}
 
-	Ok(sorted_results.len())
+	Ok(sorted_len)
 }
