@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Bug Fixes
+
+* **sort:** Fixed date parsing to support timezone-less formats (e.g., "2024-01-15 10:30:00") by treating them as UTC
+
 ## [0.4.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.3.0...jsonl-viewer-v0.4.0) (2025-12-15)
 
 

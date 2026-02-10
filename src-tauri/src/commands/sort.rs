@@ -68,18 +68,30 @@ fn to_sort_value(val: &serde_json::Value) -> SortValue {
 
 /// Parse ISO 8601 date string to Unix timestamp
 fn parse_iso_date(s: &str) -> Result<i64, ()> {
-	// Try common ISO 8601 formats
-	let formats = vec![
+	// Formats with timezone (Z suffix)
+	const TIMEZONE_FORMATS: &[&str] = &[
 		"%Y-%m-%dT%H:%M:%S%.fZ",      // 2024-01-15T10:30:00.123Z
 		"%Y-%m-%dT%H:%M:%SZ",          // 2024-01-15T10:30:00Z
+	];
+
+	// Formats without timezone (treated as UTC)
+	const NAIVE_FORMATS: &[&str] = &[
 		"%Y-%m-%d %H:%M:%S%.f",        // 2024-01-15 10:30:00.123
 		"%Y-%m-%d %H:%M:%S",           // 2024-01-15 10:30:00
 		"%Y-%m-%d",                    // 2024-01-15
 	];
 
-	for fmt in formats {
+	// Try timezone-aware formats first
+	for fmt in TIMEZONE_FORMATS {
 		if let Ok(dt) = chrono::DateTime::parse_from_str(s, fmt) {
 			return Ok(dt.timestamp());
+		}
+	}
+
+	// Try timezone-less formats (treat as UTC)
+	for fmt in NAIVE_FORMATS {
+		if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, fmt) {
+			return Ok(dt.and_utc().timestamp());
 		}
 	}
 
