@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.4.0...jsonl-viewer-v0.5.0) (2026-02-10)
+
+
+### Features
+
+* add column sorting functionality and backend support ([f27be42](https://github.com/icampana/jsonl-viewer/commit/f27be420a3241239f835b66d13a2acef6df78413))
+* add comprehensive analysis document for FileViewer component and data flow ([414c791](https://github.com/icampana/jsonl-viewer/commit/414c791d3650970c1600736f4054a6969cd99064))
+* add sorting interfaces for enhanced data organization ([c36bf53](https://github.com/icampana/jsonl-viewer/commit/c36bf5306998d2c22f7de730f0097946c1110130))
+* enhance date parsing to support timezone-less formats as UTC ([e06b60d](https://github.com/icampana/jsonl-viewer/commit/e06b60dd54c1cbc48b9d81ca3dfda02dc89de350))
+* implement sorting functionality and enhance data handling in FileViewer and StatsDialog components ([d9dea5f](https://github.com/icampana/jsonl-viewer/commit/d9dea5febbba6268bcee9726ba056a896b568e58))
+* implement sorting functionality for JSON lines and search results ([997856a](https://github.com/icampana/jsonl-viewer/commit/997856a8634b0dc81bd902963948fce2234a57ba))
+* improve sorting by handling data chunks incrementally for file lines and search results ([14a297b](https://github.com/icampana/jsonl-viewer/commit/14a297b7146e1718d26be5704071b15aac5c75b4))
+* optimize sorting performance by pre-extracting sort keys for file lines and search results ([ab998ba](https://github.com/icampana/jsonl-viewer/commit/ab998ba27a3255f8567f39e236d00ec1174a3e68))
+* refactor sorting functions to streamline JSON lines and search results processing ([c324dee](https://github.com/icampana/jsonl-viewer/commit/c324deeebb77bba4c69ac4dfc8b214dfc3d0e0db))
+
 ## [Unreleased]
 
 ### Bug Fixes
