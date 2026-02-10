@@ -49,7 +49,7 @@ async function handleContextMenu(e: MouseEvent) {
 	e.stopPropagation();
 
 	// Construct JSONPath
-	let jsonPath = path.map(p => {
+	let jsonPath = path.map((p: number | string) => {
 		if (typeof p === 'number') return `[*]`;
 		if (p === '$') return '$';
 		// If key has spaces or special chars, use bracket notation

@@ -38,7 +38,7 @@
 				<span>•</span>
 			{/if}
 			<span>
-				{$fileStore.columns.length} columns
+				{$fileStore.columnInfo.length} columns
 			</span>
 		{/if}
 	</div>

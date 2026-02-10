@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
-import type { JsonLine, FileMetadata } from '$lib/types';
+import type { JsonLine, FileMetadata, ColumnInfo } from '$lib/types';
+import { getValue } from '$lib/utils/valueFormat';
+import { sortStore } from './sortStore';
 
 interface FileState {
 	filePath: string | null;
@@ -11,7 +13,7 @@ interface FileState {
 	error: string | null;
 	metadata: FileMetadata | null;
 	selectedLineId: number | null;
-	columns: string[];
+	columnInfo: ColumnInfo[];
 }
 
 function createFileStore() {
@@ -25,13 +27,19 @@ function createFileStore() {
 		error: null,
 		metadata: null,
 		selectedLineId: null,
-		columns: []
+		columnInfo: []
 	});
 
 	return {
 		subscribe,
 		setFilePath: (path: string | null) =>
-			update(state => ({ ...state, filePath: path })),
+			update((state) => {
+				// When path changes (new file), reset sort
+				if (path !== state.filePath) {
+					sortStore.reset();
+				}
+				return { ...state, filePath: path };
+			}),
 		setLoading: (loading: boolean) =>
 			update(state => ({ ...state, isLoading: loading })),
 		setError: (error: string | null) =>
@@ -50,12 +58,13 @@ function createFileStore() {
 		addLines: (lines: JsonLine[]) =>
 			update(state => {
 				const newLines = state.lines.concat(lines);
-				let columns = state.columns;
+				let columnInfo = state.columnInfo;
 
 				// Extract columns from the first batch if not yet set
-				if (columns.length === 0 && newLines.length > 0) {
+				if (columnInfo.length === 0 && newLines.length > 0) {
 					const sampleSize = Math.min(newLines.length, 50);
 					const keyCounts = new Map<string, number>();
+					const columnComplexity = new Map<string, boolean>();
 
 					// Recursive helper to find flat keys
 					const collectKeys = (obj: any, prefix: string = '', depth: number = 0) => {
@@ -66,7 +75,12 @@ function createFileStore() {
 							const newKey = prefix ? `${prefix}_${key}` : key;
 
 							// If value is simple or we hit max depth, count this key
-							if (typeof val !== 'object' || val === null || Array.isArray(val) || depth === 2) {
+							if (
+								typeof val !== 'object' ||
+								val === null ||
+								Array.isArray(val) ||
+								depth === 2
+							) {
 								keyCounts.set(newKey, (keyCounts.get(newKey) || 0) + 1);
 							} else {
 								// Recurse into object
@@ -79,11 +93,40 @@ function createFileStore() {
 						collectKeys(newLines[i].parsed);
 					}
 
+					// Check if column values are all simple (not complex) - for sortability
+					for (const col of Array.from(keyCounts.keys())) {
+						let isSortable = true;
+
+						for (let i = 0; i < sampleSize; i++) {
+							const { isComplex } = getValue(newLines[i].parsed, col);
+							if (isComplex) {
+								isSortable = false;
+								break;
+							}
+						}
+
+						columnComplexity.set(col, isSortable);
+					}
+
 					// Priority keys (include prefixes)
-					const priorityKeys = ['id', 'timestamp', 'time', 'date', 'level', 'severity', 'message', 'msg', 'name', 'type', 'status', 'user', 'meta'];
+					const priorityKeys = [
+						'id',
+						'timestamp',
+						'time',
+						'date',
+						'level',
+						'severity',
+						'message',
+						'msg',
+						'name',
+						'type',
+						'status',
+						'user',
+						'meta'
+					];
 
 					// Sort keys by priority and then by frequency
-					columns = Array.from(keyCounts.keys()).sort((a, b) => {
+					const sortedKeys = Array.from(keyCounts.keys()).sort((a, b) => {
 						const aBase = a.split('_')[0].toLowerCase();
 						const bBase = b.split('_')[0].toLowerCase();
 
@@ -99,13 +142,20 @@ function createFileStore() {
 
 						return (keyCounts.get(b) || 0) - (keyCounts.get(a) || 0);
 					}).slice(0, 100); // Increase cap to allow more columns
+
+					// Build ColumnInfo array
+					columnInfo = sortedKeys.map((path) => ({
+						path,
+						isSortable: columnComplexity.get(path) ?? false,
+						displayName: path.split('_').slice(1).join('_') || path
+					}));
 				}
 
 				return {
 					...state,
 					lines: newLines,
 					totalLines: state.lines.length + lines.length,
-					columns
+					columnInfo
 				};
 			}),
 		clearLines: () =>
@@ -113,21 +163,27 @@ function createFileStore() {
 				...state,
 				lines: [],
 				totalLines: 0,
-				columns: [],
+				columnInfo: [],
 				selectedLineId: null
 			})),
-		reset: () => set({
-			filePath: null,
-			lines: [],
-			totalLines: 0,
-			fileSize: 0,
-			format: 'JsonL',
-			isLoading: false,
-			error: null,
-			metadata: null,
-			selectedLineId: null,
-			columns: []
-		})
+		replaceLines: (newLines: JsonLine[]) =>
+			update(state => ({
+				...state,
+				lines: newLines
+			})),
+		reset: () =>
+			set({
+				filePath: null,
+				lines: [],
+				totalLines: 0,
+				fileSize: 0,
+				format: 'JsonL',
+				isLoading: false,
+				error: null,
+				metadata: null,
+				selectedLineId: null,
+				columnInfo: []
+			})
 	};
 }
 

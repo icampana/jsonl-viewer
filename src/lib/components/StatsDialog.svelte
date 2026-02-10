@@ -61,7 +61,8 @@
 			? $searchStore.results.map(r => { try { return JSON.parse(r.context) } catch (e) { return {} } })
 			: $fileStore.lines.map(l => l.parsed);
 
-		const columns = $fileStore.columns;
+		const columnInfo = $fileStore.columnInfo;
+		const columns = columnInfo.map(c => c.path);
 		const tempStats: Record<string, ColumnStats> = {};
 
 		// Initialize stats for known columns
@@ -132,7 +133,7 @@
 						<h2 class="text-lg font-semibold">Dataset Statistics</h2>
 						<p class="text-xs text-muted-foreground">
 							Analyzing {$searchStore.results.length > 0 ? $searchStore.results.length : $fileStore.lines.length} rows
-							({$fileStore.columns.length} columns)
+							({$fileStore.columnInfo.length} columns)
 						</p>
 					</div>
 				</div>

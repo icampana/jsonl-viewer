@@ -34,24 +34,27 @@ function createSearchStore() {
 			update(state => ({ ...state, results })),
 		addResults: (newResults: SearchResult[]) =>
 			update(state => ({ ...state, results: [...state.results, ...newResults] })),
+		replaceResults: (newResults: SearchResult[]) =>
+			update(state => ({ ...state, results: newResults })),
 		setStats: (stats: SearchStats | null) =>
 			update(state => ({ ...state, stats })),
 		setSearching: (searching: boolean) =>
 			update(state => ({ ...state, isSearching: searching })),
 		setError: (error: string | null) =>
 			update(state => ({ ...state, error })),
-		reset: () => set({
-			query: {
-				text: '',
-				json_path: '',
-				case_sensitive: false,
-				regex: false
-			},
-			results: [],
-			stats: null,
-			isSearching: false,
-			error: null,
-		})
+		reset: () =>
+			set({
+				query: {
+					text: '',
+					json_path: '',
+					case_sensitive: false,
+					regex: false
+				},
+				results: [],
+				stats: null,
+				isSearching: false,
+				error: null
+			})
 	};
 }
 
