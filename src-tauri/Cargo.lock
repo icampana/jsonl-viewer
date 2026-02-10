@@ -377,8 +377,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link 0.2.1",
 ]
 
@@ -1841,9 +1843,10 @@ dependencies = [
 
 [[package]]
 name = "jsonl-viewer"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "calamine",
+ "chrono",
  "csv",
  "jsonpath-rust",
  "regex",

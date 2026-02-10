@@ -3,7 +3,7 @@
 
 mod commands;
 
-use commands::{file_parser, search, export, network};
+use commands::{file_parser, search, export, network, sort};
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::Emitter;
@@ -102,7 +102,9 @@ fn main() {
             search::search_in_file,
             export::export_to_csv,
             export::export_to_excel,
-            network::download_url_to_temp
+            network::download_url_to_temp,
+            sort::sort_file_lines,
+            sort::sort_search_results
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
