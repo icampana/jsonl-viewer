@@ -1,76 +1,99 @@
 <script lang="ts">
 import { fileStore } from "$lib/stores/fileStore";
 import { searchStore } from "$lib/stores/searchStore";
+import { sortStore } from "$lib/stores/sortStore";
+import { invoke, Channel } from '@tauri-apps/api/core';
+import type { JsonLine, SearchResult } from "$lib/types";
+import { getValue } from "$lib/utils/valueFormat";
 import VirtualList from "./VirtualList.svelte";
 import Spinner from "./ui/spinner.svelte";
-import type { JsonLine } from "$lib/types";
-import { Braces } from "lucide-svelte";
-
-// Helper to safely get value for a nested column path (e.g. "user_name")
-function getValue(parsed: any, colPath: string): { text: string; isComplex: boolean } {
-    if (!parsed || typeof parsed !== "object") return { text: "", isComplex: false };
-
-    const parts = colPath.split("_");
-    let current = parsed;
-
-    for (const part of parts) {
-        if (
-            current === null ||
-            current === undefined ||
-            typeof current !== "object"
-        )
-            return { text: "", isComplex: false };
-        current = current[part];
-    }
-
-    if (current === undefined || current === null) return { text: "", isComplex: false };
-    return smartFormat(current);
-}
-
-function smartFormat(value: any): { text: string; isComplex: boolean } {
-    if (value === null || value === undefined) return { text: "", isComplex: false };
-
-    if (Array.isArray(value)) {
-        if (value.length === 0) return { text: "[]", isComplex: true };
-
-        // heuristic: check first item for common display keys
-        const first = value[0];
-        if (typeof first === 'object' && first !== null) {
-             const displayKeys = ['name', 'title', 'label', 'id', 'slug', 'email', 'username', 'code', 'key', 'status'];
-             const hit = displayKeys.find(k => k in first);
-             if (hit) {
-                 return {
-                     text: value.map((v: any) => v && v[hit]).join(", "),
-                     isComplex: true
-                 };
-             }
-        }
-
-        // fallback for mixed arrays or objects without common keys
-        const text = value.map((v: any) => {
-            if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-            return String(v);
-        }).join(", ");
-        return { text, isComplex: true };
-    }
-
-    if (typeof value === "object") {
-        const displayKeys = ['name', 'title', 'label', 'id', 'slug', 'email', 'username', 'code', 'key', 'status'];
-        const hit = displayKeys.find(k => k in value);
-        if (hit) {
-            return { text: String(value[hit]), isComplex: true };
-        }
-        return { text: JSON.stringify(value), isComplex: true };
-    }
-
-    return { text: String(value), isComplex: false };
-}
+import { Braces, ArrowUp, ArrowDown } from "lucide-svelte";
 
 let isSearching = $derived(!!($searchStore.query.text || $searchStore.query.json_path));
 
+// Sort command handlers
+async function sortFileLines(column: string, direction: 'asc' | 'desc') {
+	sortStore.setSorting(true);
+	sortStore.setColumn(column, direction);
+
+	try {
+		const channel = new Channel<JsonLine[]>();
+		let isFirstChunk = true;
+
+		channel.onmessage = (chunk) => {
+			if (isFirstChunk) {
+				fileStore.replaceLines(chunk);
+				isFirstChunk = false;
+			} else {
+				fileStore.addLines(chunk);
+			}
+		};
+
+		await invoke('sort_file_lines', {
+			path: $fileStore.filePath,
+			sortColumn: { column, direction },
+			fileFormat: $fileStore.format,
+			channel
+		});
+	} catch (error) {
+		sortStore.setError(String(error));
+	} finally {
+		sortStore.setSorting(false);
+	}
+}
+
+async function sortSearchResults(column: string, direction: 'asc' | 'desc') {
+	sortStore.setSorting(true);
+	sortStore.setColumn(column, direction);
+
+	try {
+		const channel = new Channel<SearchResult[]>();
+		let isFirstChunk = true;
+
+		channel.onmessage = (chunk) => {
+			if (isFirstChunk) {
+				searchStore.replaceResults(chunk);
+				isFirstChunk = false;
+			} else {
+				searchStore.addResults(chunk);
+			}
+		};
+
+		await invoke('sort_search_results', {
+			results: $searchStore.results,
+			sortColumn: { column, direction },
+			channel
+		});
+	} catch (error) {
+		sortStore.setError(String(error));
+	} finally {
+		sortStore.setSorting(false);
+	}
+}
+
+function handleHeaderClick(colPath: string) {
+	const currentCol = $sortStore.state.column;
+	const currentDir = $sortStore.state.direction;
+
+	// Toggle or set new column
+	let newDirection: 'asc' | 'desc';
+	if (currentCol === colPath) {
+		newDirection = currentDir === 'asc' ? 'desc' : 'asc';
+	} else {
+		newDirection = 'asc';
+	}
+
+	// Execute sort based on current context
+	if (isSearching) {
+		sortSearchResults(colPath, newDirection);
+	} else {
+		sortFileLines(colPath, newDirection);
+	}
+}
+
 let displayItems = $derived.by(() => {
     if (isSearching) {
-        return $searchStore.results.map(r => {
+        return $searchStore.results.map((r) => {
             let parsed = {};
             try {
                 parsed = JSON.parse(r.context);
@@ -86,10 +109,10 @@ let displayItems = $derived.by(() => {
     return $fileStore.lines;
 });
 
-let columns = $derived($fileStore.columns);
+let columnInfo = $derived($fileStore.columnInfo);
 let gridCols = $derived(
-    columns.length > 0
-        ? `60px repeat(${columns.length}, minmax(100px, 1fr))`
+    columnInfo.length > 0
+        ? `60px repeat(${columnInfo.length}, minmax(100px, 1fr))`
         : "1fr",
 );
 
@@ -108,8 +131,8 @@ let gridCols = $derived(
         let currentGroup = "";
         let currentSpan = 0;
 
-        for (const col of columns) {
-            const parts = col.split("_");
+        for (const col of columnInfo) {
+            const parts = col.path.split("_");
             const groupName = parts.length > 1 ? parts[0] : "";
 
             if (groupName && groupName === currentGroup) {
@@ -125,7 +148,7 @@ let gridCols = $derived(
                         // Push the previous group
                         // (Already handled above: currentGroup check)
                     }
-                    groups.push({ name: col, span: 1, isGroup: false });
+                    groups.push({ name: col.path, span: 1, isGroup: false });
                     currentGroup = "";
                     currentSpan = 0;
                 } else {
@@ -144,16 +167,16 @@ let gridCols = $derived(
     });
 
 	let totalMinWidth = $derived(
-		columns.length > 0
-			? 60 + columns.length * 100 // 60px ID + 100px per column
+		columnInfo.length > 0
+			? 60 + columnInfo.length * 100 // 60px ID + 100px per column
 			: "100%"
 	);
 </script>
 
-<div class="flex-1 flex flex-col h-full overflow-hidden">
-    {#if $fileStore.isLoading || ($searchStore.isSearching && displayItems.length === 0)}
+ <div class="flex-1 flex flex-col h-full overflow-hidden">
+    {#if $fileStore.isLoading || ($searchStore.isSearching && displayItems.length === 0) || $sortStore.isSorting}
         <div class="flex items-center justify-center h-full">
-            <Spinner size="lg" text={isSearching ? "Searching..." : "Loading file..."} />
+            <Spinner size="lg" text={$sortStore.isSorting ? "Sorting..." : isSearching ? "Searching..." : "Loading file..."} />
         </div>
     {:else if $fileStore.error || $searchStore.error}
         <div class="flex items-center justify-center h-full">
@@ -192,7 +215,7 @@ let gridCols = $derived(
                     </div>
                 {/each}
 
-                {#if columns.length === 0}
+                {#if columnInfo.length === 0}
                     <div class="p-2">Content</div>
                 {/if}
             </div>
@@ -201,11 +224,30 @@ let gridCols = $derived(
             <div class="grid border-t border-border/30 bg-background/50" style="grid-template-columns: {gridCols}; padding-right: 8px; min-width: {typeof totalMinWidth === 'number' ? totalMinWidth + 'px' : totalMinWidth};">
                 <div class="bg-muted/10 border-r border-border/30"></div> <!-- Spacer for ID -->
 
-                {#each columns as col}
-                    {@const parts = col.split('_')}
-                    {@const displayName = parts.length > 1 ? parts.slice(1).join('_') : parts[0]}
-                    <div class="p-1 px-2 text-muted-foreground text-xs truncate border-r border-border/30" title={col}>
-                        {displayName}
+                {#each columnInfo as col}
+                    <div
+                        class="p-1 px-2 text-muted-foreground text-xs truncate border-r border-border/30
+                            {col.isSortable ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50'}
+                            {$sortStore.state.column === col.path ? 'font-bold text-foreground' : ''}"
+                        title={col.path}
+                        onmousedown={() => col.isSortable && handleHeaderClick(col.path)}
+                        onkeydown={(e) => col.isSortable && e.key === 'Enter' && handleHeaderClick(col.path)}
+                        role="columnheader"
+                        tabindex={col.isSortable ? 0 : -1}
+                        aria-sort={$sortStore.state.column === col.path
+                            ? $sortStore.state.direction === 'asc' ? 'ascending' : 'descending'
+                            : 'none'}
+                    >
+                        <div class="flex items-center gap-1">
+                            <span>{col.displayName}</span>
+                            {#if $sortStore.state.column === col.path}
+                                {#if $sortStore.state.direction === 'asc'}
+                                    <ArrowUp class="w-3 h-3" />
+                                {:else}
+                                    <ArrowDown class="w-3 h-3" />
+                                {/if}
+                            {/if}
+                        </div>
                     </div>
                 {/each}
             </div>
@@ -234,8 +276,8 @@ let gridCols = $derived(
 						<div class="px-3 text-muted-foreground truncate">{item.id}</div>
 
 						<!-- Dynamic Columns -->
-						{#each columns as col}
-                            {@const val = getValue(item.parsed, col)}
+						{#each columnInfo as col}
+                            {@const val = getValue(item.parsed, col.path)}
 							<div class="px-2 truncate border-l border-border/30 h-full flex items-center gap-1.5" title={val.text}>
                                 {#if val.isComplex}
                                     <Braces class="w-3 h-3 text-muted-foreground/70 shrink-0" />
@@ -245,7 +287,7 @@ let gridCols = $derived(
 						{/each}
 
 						<!-- Fallback content if no columns (e.g. primitive array) -->
-						{#if columns.length === 0}
+						{#if columnInfo.length === 0}
 							<div class="px-2 truncate h-full flex items-center">{item.content}</div>
 						{/if}
 					</div>

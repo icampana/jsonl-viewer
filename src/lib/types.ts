@@ -41,3 +41,19 @@ export interface ExportStats {
 }
 
 export type ExportFormat = 'JsonL' | 'JsonArray' | 'Csv' | 'Excel';
+
+export interface SortState {
+	column: string | null;
+	direction: 'asc' | 'desc';
+}
+
+export interface SortColumn {
+	column: string;
+	direction: string;
+}
+
+export interface ColumnInfo {
+	path: string;
+	isSortable: boolean;
+	displayName: string;
+}
