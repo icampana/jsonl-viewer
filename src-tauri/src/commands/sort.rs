@@ -122,6 +122,84 @@ fn compare_sort_values(a: &SortValue, b: &SortValue, direction: &str) -> std::cm
 	}
 }
 
+/// Helper function to sort JsonLine items and stream results
+async fn sort_and_stream_json_lines(
+	mut items: Vec<(usize, JsonLine, SortValue)>,
+	direction: String,
+	channel: Channel<Vec<JsonLine>>,
+) -> Result<usize, String> {
+	// Sort by pre-extracted values
+	items.sort_by(|a, b| {
+		let cmp = compare_sort_values(&a.2, &b.2, &direction);
+		if cmp == std::cmp::Ordering::Equal {
+			a.0.cmp(&b.0)  // Stable sort by original index
+		} else {
+			cmp
+		}
+	});
+
+	// Extract sorted lines for streaming
+	let lines: Vec<JsonLine> = items.into_iter().map(|(_, line, _)| line).collect();
+	let lines_len = lines.len();
+
+	// Stream sorted results
+	const CHUNK_SIZE: usize = 2000;
+	let mut chunk: Vec<JsonLine> = Vec::with_capacity(CHUNK_SIZE);
+
+	for line in &lines {
+		chunk.push(line.clone());
+		if chunk.len() >= CHUNK_SIZE {
+			channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
+			chunk.clear();
+		}
+	}
+
+	if !chunk.is_empty() {
+		channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
+	}
+
+	Ok(lines_len)
+}
+
+/// Helper function to sort SearchResult items and stream results
+async fn sort_and_stream_search_results(
+	mut items: Vec<(usize, SearchResult, SortValue)>,
+	direction: String,
+	channel: Channel<Vec<SearchResult>>,
+) -> Result<usize, String> {
+	// Sort by pre-extracted values
+	items.sort_by(|a, b| {
+		let cmp = compare_sort_values(&a.2, &b.2, &direction);
+		if cmp == std::cmp::Ordering::Equal {
+			a.0.cmp(&b.0)  // Stable sort by original index
+		} else {
+			cmp
+		}
+	});
+
+	// Extract sorted results for streaming
+	let sorted_results: Vec<SearchResult> = items.into_iter().map(|(_, result, _)| result).collect();
+	let sorted_len = sorted_results.len();
+
+	// Stream sorted results
+	const CHUNK_SIZE: usize = 100;
+	let mut chunk: Vec<SearchResult> = Vec::with_capacity(CHUNK_SIZE);
+
+	for result in &sorted_results {
+		chunk.push(result.clone());
+		if chunk.len() >= CHUNK_SIZE {
+			channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
+			chunk.clear();
+		}
+	}
+
+	if !chunk.is_empty() {
+		channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
+	}
+
+	Ok(sorted_len)
+}
+
 /// Command to sort all lines in a file by a column
 #[tauri::command]
 pub async fn sort_file_lines(
@@ -145,7 +223,7 @@ pub async fn sort_file_lines(
 
 		if let Some(array) = json.as_array() {
 			// Extract sort keys once per item for better performance
-			let mut lines_with_keys: Vec<(usize, JsonLine, SortValue)> = array
+			let items: Vec<(usize, JsonLine, SortValue)> = array
 				.iter()
 				.enumerate()
 				.map(|(index, item)| {
@@ -164,37 +242,7 @@ pub async fn sort_file_lines(
 				})
 				.collect();
 
-			// Sort by pre-extracted values
-			lines_with_keys.sort_by(|a, b| {
-				let cmp = compare_sort_values(&a.2, &b.2, &direction);
-				if cmp == std::cmp::Ordering::Equal {
-					a.0.cmp(&b.0)  // Stable sort by original index
-				} else {
-					cmp
-				}
-			});
-
-			// Extract sorted lines for streaming
-			let lines: Vec<JsonLine> = lines_with_keys.into_iter().map(|(_, line, _)| line).collect();
-			let lines_len = lines.len();
-
-			// Stream sorted results
-			const CHUNK_SIZE: usize = 2000;
-			let mut chunk: Vec<JsonLine> = Vec::with_capacity(CHUNK_SIZE);
-
-			for line in &lines {
-				chunk.push(line.clone());
-				if chunk.len() >= CHUNK_SIZE {
-					channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
-					chunk.clear();
-				}
-			}
-
-			if !chunk.is_empty() {
-				channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
-			}
-
-			return Ok(lines_len);
+			return sort_and_stream_json_lines(items, direction, channel).await;
 		}
 	}
 
@@ -207,14 +255,14 @@ pub async fn sort_file_lines(
 	let mut lines = reader.lines();
 
 	let mut line_num = 0;
-	let mut all_lines: Vec<(usize, JsonLine, SortValue)> = Vec::new();
+	let mut items: Vec<(usize, JsonLine, SortValue)> = Vec::new();
 
 	while let Ok(Some(line)) = lines.next_line().await {
 		if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
 			let sort_val = get_nested_value(&json, &column_path);
 			let sort_key = sort_val.as_ref().map(|v| to_sort_value(v)).unwrap_or(SortValue::Null);
 
-			all_lines.push((
+			items.push((
 				line_num,
 				JsonLine {
 					id: line_num,
@@ -228,37 +276,7 @@ pub async fn sort_file_lines(
 		line_num += 1;
 	}
 
-	// Sort by pre-extracted values
-	all_lines.sort_by(|a, b| {
-		let cmp = compare_sort_values(&a.2, &b.2, &direction);
-		if cmp == std::cmp::Ordering::Equal {
-			a.0.cmp(&b.0)  // Stable sort by original index
-		} else {
-			cmp
-		}
-	});
-
-	// Extract sorted lines for streaming
-	let lines: Vec<JsonLine> = all_lines.into_iter().map(|(_, line, _)| line).collect();
-	let lines_len = lines.len();
-
-	// Stream sorted results
-	const CHUNK_SIZE: usize = 2000;
-	let mut chunk: Vec<JsonLine> = Vec::with_capacity(CHUNK_SIZE);
-
-	for line in &lines {
-		chunk.push(line.clone());
-		if chunk.len() >= CHUNK_SIZE {
-			channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
-			chunk.clear();
-		}
-	}
-
-	if !chunk.is_empty() {
-		channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
-	}
-
-	Ok(lines_len)
+	sort_and_stream_json_lines(items, direction, channel).await
 }
 
 /// Command to sort search results by a column
@@ -272,7 +290,7 @@ pub async fn sort_search_results(
 	let column_path = sort_column.column.clone();
 
 	// Extract sort keys once per item for better performance
-	let mut results_with_keys: Vec<(usize, SearchResult, SortValue)> = results
+	let items: Vec<(usize, SearchResult, SortValue)> = results
 		.into_iter()
 		.enumerate()
 		.map(|(index, result)| {
@@ -283,35 +301,5 @@ pub async fn sort_search_results(
 		})
 		.collect();
 
-	// Sort by pre-extracted values
-	results_with_keys.sort_by(|a, b| {
-		let cmp = compare_sort_values(&a.2, &b.2, &direction);
-		if cmp == std::cmp::Ordering::Equal {
-			a.0.cmp(&b.0)  // Stable sort by original index
-		} else {
-			cmp
-		}
-	});
-
-	// Extract sorted results for streaming
-	let sorted_results: Vec<SearchResult> = results_with_keys.into_iter().map(|(_, result, _)| result).collect();
-	let sorted_len = sorted_results.len();
-
-	// Stream sorted results
-	const CHUNK_SIZE: usize = 100;
-	let mut chunk: Vec<SearchResult> = Vec::with_capacity(CHUNK_SIZE);
-
-	for result in &sorted_results {
-		chunk.push(result.clone());
-		if chunk.len() >= CHUNK_SIZE {
-			channel.send(chunk.clone()).map_err(|e| format!("Failed to send: {}", e))?;
-			chunk.clear();
-		}
-	}
-
-	if !chunk.is_empty() {
-		channel.send(chunk).map_err(|e| format!("Failed to send: {}", e))?;
-	}
-
-	Ok(sorted_len)
+	sort_and_stream_search_results(items, direction, channel).await
 }
