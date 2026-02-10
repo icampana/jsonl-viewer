@@ -18,10 +18,15 @@ async function sortFileLines(column: string, direction: 'asc' | 'desc') {
 
 	try {
 		const channel = new Channel<JsonLine[]>();
-		let allSortedLines: JsonLine[] = [];
+		let isFirstChunk = true;
 
 		channel.onmessage = (chunk) => {
-			allSortedLines = allSortedLines.concat(chunk);
+			if (isFirstChunk) {
+				fileStore.replaceLines(chunk);
+				isFirstChunk = false;
+			} else {
+				fileStore.addLines(chunk);
+			}
 		};
 
 		await invoke('sort_file_lines', {
@@ -30,8 +35,6 @@ async function sortFileLines(column: string, direction: 'asc' | 'desc') {
 			fileFormat: $fileStore.format,
 			channel
 		});
-
-		fileStore.replaceLines(allSortedLines);
 	} catch (error) {
 		sortStore.setError(String(error));
 	} finally {
@@ -45,10 +48,15 @@ async function sortSearchResults(column: string, direction: 'asc' | 'desc') {
 
 	try {
 		const channel = new Channel<SearchResult[]>();
-		let allSortedResults: SearchResult[] = [];
+		let isFirstChunk = true;
 
 		channel.onmessage = (chunk) => {
-			allSortedResults = allSortedResults.concat(chunk);
+			if (isFirstChunk) {
+				searchStore.replaceResults(chunk);
+				isFirstChunk = false;
+			} else {
+				searchStore.addResults(chunk);
+			}
 		};
 
 		await invoke('sort_search_results', {
@@ -56,8 +64,6 @@ async function sortSearchResults(column: string, direction: 'asc' | 'desc') {
 			sortColumn: { column, direction },
 			channel
 		});
-
-		searchStore.replaceResults(allSortedResults);
 	} catch (error) {
 		sortStore.setError(String(error));
 	} finally {
