@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.5.0...jsonl-viewer-v0.5.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **file-load:** flush channel buffer eagerly to prevent empty grid ([2dd0fd4](https://github.com/icampana/jsonl-viewer/commit/2dd0fd43c2f5e8c19574449d206f3bded726eb1c))
+* **file-load:** flush channel buffer eagerly to prevent empty grid ([5aa5401](https://github.com/icampana/jsonl-viewer/commit/5aa5401c11c7660feb7006ff5bb19a27ee573b4b))
+
 ## [0.5.0](https://github.com/icampana/jsonl-viewer/compare/jsonl-viewer-v0.4.0...jsonl-viewer-v0.5.0) (2026-02-10)
 
 
