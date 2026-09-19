@@ -76,28 +76,19 @@ async function loadFile(path: string) {
 
     const channel = new Channel<JsonLine[]>();
     let buffer: JsonLine[] = [];
-    let lastFlush = Date.now();
-    const FLUSH_INTERVAL = 100; // ms
-    const MAX_BUFFER_SIZE = 5000;
 
     const flushBuffer = () => {
         if (buffer.length > 0) {
             fileStore.addLines(buffer);
             buffer = [];
-            lastFlush = Date.now();
         }
     };
 
     channel.onmessage = (message) => {
         buffer.push(...message);
-
-        const now = Date.now();
-        if (
-            buffer.length >= MAX_BUFFER_SIZE ||
-            now - lastFlush > FLUSH_INTERVAL
-        ) {
-            flushBuffer();
-        }
+        // Flush eagerly: the final chunk can arrive after the invoke resolves,
+        // so waiting for a debounce interval can strand all lines (empty grid).
+        flushBuffer();
     };
 
     try {
@@ -105,9 +96,6 @@ async function loadFile(path: string) {
             path: path,
             channel,
         });
-
-        // Final flush
-        flushBuffer();
 
         fileStore.setMetadata(metadata as FileMetadata);
     } catch (error) {
